@@ -1,0 +1,5 @@
+config BR2_PACKAGE_FPGA_SOUNDCARD
+	bool "fpga-soundcard"
+	depends on BR2_LINUX_KERNEL
+	help
+	  FPGA soundcard controlled by I2C and its respective device tree overlay

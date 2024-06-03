@@ -1,0 +1,5 @@
+config SND_SOC_FPGA_SOUNDCARD
+        tristate "RK33xx platform machine driver for a fpga soundcard controlled by I2C"
+        default n
+        help
+          ALSA machine driver for a dummy soundcard
