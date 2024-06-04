@@ -12,11 +12,11 @@ FPGA_SOUNDCARD_DEPENDENCIES =
 # Kernel module section
 FPGA_SOUNDCARD_MODULE_SUBDIRS = module-fpga-soundcard
 FPGA_SOUNDCARD_MODULE_MAKE_OPTS = \
-	INSTALL_MOD_DIR=kernel/sound/soc/rockchip \
-	CONFIG_SND_SOC_FPGA_SOUNDCARD=m
+	INSTALL_MOD_DIR=kernel/sound/soc/codecs \
+	CONFIG_SND_SOC_FPGA_SOUNDCARD=m \
+	CONFIG_SND_SOC_FPGA_SOUNDCARD_DEBUG=y
 
 define FPGA_SOUNDCARD_INSTALL_MOD
-	mkdir -p ${BINARIES_DIR}/rockchip/overlays
 	$(INSTALL) -D -m 644 $(@D)/$(FPGA_SOUNDCARD_MODULE_SUBDIRS)/fpga-soundcard.dtbo $(BUILD_DIR)/rpi-firmware-$(RPI_FIRMWARE_VERSION)/boot/overlays/
 
 	scp -rpO $(BUILD_DIR)/fpga-soundcard-$(FPGA_SOUNDCARD_VERSION)/module-fpga-soundcard/snd-soc-fpga-codec.ko root@buildroot.local:/root/
