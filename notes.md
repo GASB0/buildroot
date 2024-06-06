@@ -10,32 +10,35 @@ modprobe snd-soc-simple-card
 modprobe snd-soc-bcm2835-i2s
 insmod ./snd-soc-fpga-codec.ko
 
-# Removing the fpga card
 rmmod snd_soc_simple_card
-rmmod snd_soc_simple_card_utils
-rmmod snd_soc_bcm2835_i2s
 rmmod snd_soc_fpga_codec
-rmmod snd_soc_core
+
+insmod ./snd-soc-fpga-codec.ko
 ```
 
 Starting serial debugging:
 ```bash
-# On the host machine gdb
-./output/host/bin/arm-buildroot-linux-gnueabihf-gdb ./output/build/linux-custom/vmlinux
-set serial baud 115200
-
 # On target machine
-MODULE_NAME=snd_soc_fpga_codec
-MODULE_FILE=$(modinfo $MODULE_NAME| awk '/filename/{print $2}')
-DIR="/sys/module/${MODULE_NAME}/sections/"
-# echo add-symbol-file $MODULE_FILE -s $(cat "$DIR/.text") -s .bss $(cat "$DIR/.bss") -s .data $(cat "$DIR/.data") # Run his on host
-echo add-symbol-file $MODULE_FILE -s .data $(cat "$DIR/.data") # Run his on host
-
-# On the host machine gdb
-target remote /dev/ttyUSB0
+modprobe snd-soc-simple-card
+modprobe snd-soc-bcm2835-i2s
+insmod ./snd-soc-fpga-codec.ko
 
 echo ttyAMA0 > /sys/module/kgdboc/parameters/kgdboc
 echo g > /proc/sysrq-trigger
+
+# On the host machine gdb
+./output/host/bin/arm-buildroot-linux-gnueabihf-gdb ./output/build/linux-custom/vmlinux -iex "set auto-load safe-path /" -tui
+target remote /dev/ttyUSB0
+lx-symbols /home/gabriel/Documents/Projects/buildroot/output/build/fpga-soundcard-0.0.1/module-fpga-soundcard/
+break fpga-codec.c:45
+continue
+
+# On target mahcine
+rmmod snd_soc_simple_card
+rmmod snd_soc_fpga_codec
+
+modprobe snd-soc-simple-card
+insmod ./snd-soc-fpga-codec.ko
 ```
 
 Debugging loadble kernel modules with with kgdb:
