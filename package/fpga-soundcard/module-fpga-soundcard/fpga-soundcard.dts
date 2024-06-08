@@ -62,11 +62,16 @@
     fragment@4{
 	target= <&i2c1>;
 	__overlay__ {
+            #address-cells = <1>;
+    	#sound-dai-cells = <0>;
+            #size-cells = <0>;
 	    status = "okay";
+
 	    GW5A-LV25MG121@13 {
+                #sound-dai-cells = <0>;
 		compatible = "flatmax,bare";
-		status = "okay";
 		reg = <0x13>;
+		status = "okay";
 	    };
 	};
     };

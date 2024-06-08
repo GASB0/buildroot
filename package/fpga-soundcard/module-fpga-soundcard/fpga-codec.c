@@ -9,6 +9,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/regmap.h>
 #include <linux/i2c.h>
 #include <linux/kgdb.h>
 #include <sound/soc.h>
@@ -21,8 +22,8 @@ enum gowinxxxx_type {
 
 struct gowinxxxx_priv {
 	struct snd_soc_component *component;
-	unsigned int dac_clk;
-	struct i2c_client *i2c;
+	struct regmap *regmap;
+        /* struct i2c_client *i2c; */
 	/* u16 *reg_cache; */
 };
 
@@ -74,7 +75,7 @@ static const struct regmap_config gowinxxxx_regmap = {
 };
 
 static struct snd_soc_dai_driver fpga_dai = {
-    .name = "bare-hifi",
+    .name = "fpga-hifi",
     .playback = {
                  .channels_min = 2,
                  .channels_max = 2,
@@ -144,17 +145,40 @@ static struct snd_soc_component_driver soc_component_dev_fpga = {
 
 static int fpga_i2c_probe(struct i2c_client *i2c)
 {
-        int ret;
+        int ret = 0;
+	struct gowinxxxx_priv *gowinxxxx = NULL;
+	const struct i2c_device_id *id;
+        unsigned int regval;
+
+	printk(KERN_INFO "Initializing routine for allocating device specific data");
+	gowinxxxx = devm_kzalloc(&i2c->dev, sizeof(struct gowinxxxx_priv), GFP_KERNEL);
+	if (!gowinxxxx)
+		return -ENOMEM;
+
+	printk(KERN_INFO "Initializing regmap");        
+	gowinxxxx->regmap = devm_regmap_init_i2c(i2c, &gowinxxxx_regmap);
+	if (IS_ERR(gowinxxxx->regmap)) {
+		ret = PTR_ERR(gowinxxxx->regmap);
+		dev_err(&i2c->dev, "Failed to allocate register map: %d\n", ret);
+		return ret;
+	}
+
+	/* printk(KERN_INFO "Matching id"); */
+	/* id = i2c_match_id(fpga_i2c_id, i2c); */
+        /* gowinxxxx->type = id->driver_data; */
+	/* printk(KERN_INFO "ID: %s", id->name); */
+
+	regmap_read(gowinxxxx->regmap, 0x00, &regval);
+	printk(KERN_INFO "Reading from the the chip %02x", regval);
+
 	printk(KERN_INFO "Registering device");
-	/* kgdb_breakpoint(); */
 	ret = devm_snd_soc_register_component(&i2c->dev,
 					      &soc_component_dev_fpga, &fpga_dai, 1);
-	printk(KERN_INFO "Result of the registration %d", ret);
 	return ret;
 }
 
 static const struct of_device_id gowinxxxx_of_match[] = {
-	{ .compatible = "flatmax,bare", },
+	{ .compatible = "linux,spdif-dit", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, gowinxxxx_of_match);
@@ -168,7 +192,7 @@ MODULE_DEVICE_TABLE(i2c, fpga_i2c_id);
 static struct i2c_driver fpga_codec_driver = {
 	.driver		= {
 		.name	= "fpga-codec",
-		.of_match_table = gowinxxxx_of_match,
+		.of_match_table = of_match_ptr(gowinxxxx_of_match),
 	},
 	.probe_new	= fpga_i2c_probe,
 	.id_table = fpga_i2c_id,
