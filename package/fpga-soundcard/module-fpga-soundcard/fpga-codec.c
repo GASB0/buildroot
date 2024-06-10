@@ -21,7 +21,6 @@
 
 #define FPGA_INS_REG		        0x32
 
-
 #define FPGA_DATA_BUFF_LSB		0x40
 #define FPGA_DATA_BUFF_LMB		0x41
 #define FPGA_DATA_BUFF_HMB		0x42
@@ -59,36 +58,32 @@ static const struct regmap_range_cfg gowinxxxx_ranges[] = {
 static const struct reg_default gowinxxxx_defaults[] =
     {
 	/* Configuration and instruction registers */
-	{0x30, 0xA0}, {0x31, 0x0F}, {0x32, 0x00},
-
-	/* {0x33, 0x00}, {0x34, 0x00}, {0x35, 0x00}, */
- 	/* {0x36, 0x00}, {0x37, 0x00}, {0x38, 0x00}, */
-	/* {0x39, 0x00}, {0x3A, 0x00}, {0x3B, 0x00}, */
-	/* {0x3C, 0x00}, {0x3D, 0x00}, {0x3E, 0x00}, */
-	/* {0x3F, 0x00}, */
+	{FPGA_FILTER_TAPS_LSB, 0xA0},
+	{FPGA_FILTER_TAPS_MSB, 0x0F},
+	
+	{FPGA_INS_REG, 0x00},
 
 	/* Data buffer  */
-	{0x40, 0x00}, {0x41, 0x00}, {0x42, 0x00}, {0x43, 0x00},	{0x44, 0x00},
+	{FPGA_DATA_BUFF_LSB, 0x00},
+	{FPGA_DATA_BUFF_LMB, 0x00},
+	{FPGA_DATA_BUFF_HMB, 0x00},
+	{FPGA_DATA_BUFF_MSB, 0x00},
 
 	/* Address buffer */
-	{0x48, 0x00}, {0x49, 0x00}, {0x4A, 0x00}, {0x4B, 0x00},
+	{FPGA_ADDR_BUFF_LSB, 0x00},
+	{FPGA_ADDR_BUFF_LMB, 0x00},
+	{FPGA_ADDR_BUFF_HMB, 0x00},
+	{FPGA_ADDR_BUFF_MSB, 0x00},
     };
 
 static const struct regmap_config gowinxxxx_regmap = {
     .reg_bits = 8,
     .val_bits = 8,
 
-    /* .writable_reg=, */
-    /* .readable_reg=, */
-    /* .precious_reg=, */
-    /* .volatile_reg = , */
-
-    /* .reg_defaults = gowinxxxx_defaults, */
-    /* .num_reg_defaults = ARRAY_SIZE(gowinxxxx_defaults), */
-    /* .cache_type = REGCACHE_RBTREE, */
-    /* .ranges = gowinxxxx_ranges, */
-    /* .num_ranges = ARRAY_SIZE(gowinxxxx_ranges), */
-    .max_register = 0xffff,
+    .max_register = 0xFFFF,
+    .reg_defaults = gowinxxxx_defaults,
+    .num_reg_defaults = ARRAY_SIZE(gowinxxxx_defaults),
+    .cache_type = REGCACHE_FLAT,
 };
 
 static struct snd_soc_dai_driver fpga_dai = {
@@ -196,7 +191,6 @@ static struct snd_soc_component_driver soc_component_dev_fpga = {
 	.idle_bias_on		= 1,
 	.use_pmdown_time	= 1,
 	.endianness		= 1,
-	/* .non_legacy_dai_naming	= 1, */
 };
 
 static int fpga_i2c_probe(struct i2c_client *i2c)
@@ -217,19 +211,10 @@ static int fpga_i2c_probe(struct i2c_client *i2c)
 		return ret;
 	}
 
-	/* printk(KERN_INFO "Matching id"); */
-	/* id = i2c_match_id(fpga_i2c_id, i2c); */
-        /* gowinxxxx->type = id->driver_data; */
-	/* printk(KERN_INFO "ID: %s", id->name); */
-
-	/* printk(KERN_INFO "Reading from the the chip %02x", regval); */
-
 	// Configuring the chip on start
-	printk(KERN_INFO "Setting up the number of filtertaps for the FPGA codec");
-	regmap_write(gowinxxxx->regmap, FPGA_FILTER_TAPS_LSB, 0xFF);
-	regmap_write(gowinxxxx->regmap, FPGA_FILTER_TAPS_MSB, 0x0F);
-
-	// Configuring the default state IO state for the block RAM
+	printk(KERN_INFO "Initializing I2C registers");
+	regcache_mark_dirty(gowinxxxx->regmap);
+	regcache_sync(gowinxxxx->regmap);	
 
 	// Registering the audio component to ALSA
 	printk(KERN_INFO "Registering device");
@@ -239,7 +224,7 @@ static int fpga_i2c_probe(struct i2c_client *i2c)
 }
 
 static const struct of_device_id gowinxxxx_of_match[] = {
-	{ .compatible = "linux,spdif-dit", },
+	{ .compatible = "flatmax,bare", },
 	{ },
 };
 MODULE_DEVICE_TABLE(of, gowinxxxx_of_match);
