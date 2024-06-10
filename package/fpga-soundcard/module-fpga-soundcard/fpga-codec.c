@@ -15,6 +15,23 @@
 #include <sound/soc.h>
 #include <linux/clk.h>
 
+// Definition of some important registers for our board configuration
+#define FPGA_FILTER_TAPS_LSB	        0x30
+#define FPGA_FILTER_TAPS_MSB	        0x31
+
+#define FPGA_INS_REG		        0x32
+
+
+#define FPGA_DATA_BUFF_LSB		0x40
+#define FPGA_DATA_BUFF_LMB		0x41
+#define FPGA_DATA_BUFF_HMB		0x42
+#define FPGA_DATA_BUFF_MSB		0x43
+
+#define FPGA_ADDR_BUFF_LSB		0x48
+#define FPGA_ADDR_BUFF_LMB		0x49
+#define FPGA_ADDR_BUFF_HMB		0x4A
+#define FPGA_ADDR_BUFF_MSB		0x4B
+
 enum gowinxxxx_type {
         GW5A = 0,
         GW2A
@@ -97,11 +114,28 @@ static struct snd_soc_dai_driver fpga_dai = {
 static int fpga_coefficient_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	/* struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol); */
-	/* struct gowinxxxx *gowinxxxx = snd_soc_component_get_drvdata(component); */
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	unsigned int read_value;
 
-        /* int regval; */
-	/* regmap_read(gowinxxxx->regmap, 0x01, &regval); */
+	regmap_write(component->regmap, FPGA_INS_REG, 0x00);
+
+	// This part writes on the address registers
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_LSB, (int)ucontrol->value.bytes.data[0]);
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_LMB, (int)ucontrol->value.bytes.data[1]);
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_HMB, (int)ucontrol->value.bytes.data[2]);
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_MSB, (int)ucontrol->value.bytes.data[3]);
+
+
+	// This part reads on the data registers
+	regmap_write(component->regmap, FPGA_INS_REG, 0x00);
+	regmap_read(component->regmap, FPGA_DATA_BUFF_LSB, &read_value);
+	ucontrol->value.bytes.data[0] = (unsigned char)read_value;
+	regmap_read(component->regmap, FPGA_DATA_BUFF_LMB, &read_value);
+	ucontrol->value.bytes.data[1] = (unsigned char)read_value;
+	regmap_read(component->regmap, FPGA_DATA_BUFF_HMB, &read_value);
+	ucontrol->value.bytes.data[2] = (unsigned char)read_value;
+	regmap_read(component->regmap, FPGA_DATA_BUFF_MSB, &read_value);
+	ucontrol->value.bytes.data[3] = (unsigned char)read_value;
 
   return 0;
 }
@@ -109,20 +143,33 @@ static int fpga_coefficient_get(struct snd_kcontrol *kcontrol,
 static int fpga_coefficient_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	/* struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol); */
-	/* struct gowinxxxx *gowinxxxx = snd_soc_component_get_drvdata(component); */
-  return 0;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+
+	// Making sure that the FPGA is in write mode
+	regmap_write(component->regmap, FPGA_INS_REG, 0x01);
+
+	// This part writes on the data registers
+	regmap_write(component->regmap, FPGA_DATA_BUFF_LSB, ucontrol->value.bytes.data[4]);
+	regmap_write(component->regmap, FPGA_DATA_BUFF_LMB, ucontrol->value.bytes.data[5]);
+	regmap_write(component->regmap, FPGA_DATA_BUFF_HMB, ucontrol->value.bytes.data[6]);
+	regmap_write(component->regmap, FPGA_DATA_BUFF_MSB, ucontrol->value.bytes.data[7]);
+
+	// This part writes on the address registers
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_LSB, ucontrol->value.bytes.data[0]);
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_LMB, ucontrol->value.bytes.data[1]);
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_HMB, ucontrol->value.bytes.data[2]);
+	regmap_write(component->regmap, FPGA_ADDR_BUFF_MSB, ucontrol->value.bytes.data[3]);
+
+	return 0;
 }
 
 static int fpga_coefficient_info(struct snd_kcontrol *kcontrol,
                                  struct snd_ctl_elem_info *uinfo)
 {
-	/* struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol); */
-	/* struct gowinxxxx *gowinxxxx = snd_soc_component_get_drvdata(component); */
   return 0;
 }
 
-#define FPGA_FILTER_COEFFICIENTS_CONTROL(xname, xcount, xmin, xmax) \
+#define FPGA_FILTER_COEFFICIENTS_VALUES(xname, xcount, xmin, xmax) \
  {	.iface = SNDRV_CTL_ELEM_IFACE_CARD, \
 	.name = xname, \
 	.info = fpga_coefficient_info, \
@@ -130,8 +177,17 @@ static int fpga_coefficient_info(struct snd_kcontrol *kcontrol,
 	.put  = fpga_coefficient_put, \
 	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE }
 
+/* #define FPGA_FILTER_COEFFICIENTS_NUMBER(xname, xcount, xmin, xmax) \ */
+/*  {	.iface = SNDRV_CTL_ELEM_IFACE_CARD, \ */
+/* 	.name = xname, \ */
+/* 	.info = , \ */
+/* 	.get  = , \ */
+/* 	.put  = , \ */
+/* 	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE } */
+
+
 static struct snd_kcontrol_new fpga_filter_controls[] = {
-        FPGA_FILTER_COEFFICIENTS_CONTROL("FPGA FIR Coefficients", 0, 20, 5)
+        FPGA_FILTER_COEFFICIENTS_VALUES("FPGA FIR Coefficients Values", 0, 20, 5)
 };
 
 static struct snd_soc_component_driver soc_component_dev_fpga = {
@@ -147,8 +203,6 @@ static int fpga_i2c_probe(struct i2c_client *i2c)
 {
         int ret = 0;
 	struct gowinxxxx_priv *gowinxxxx = NULL;
-	const struct i2c_device_id *id;
-        unsigned int regval;
 
 	printk(KERN_INFO "Initializing routine for allocating device specific data");
 	gowinxxxx = devm_kzalloc(&i2c->dev, sizeof(struct gowinxxxx_priv), GFP_KERNEL);
@@ -168,9 +222,16 @@ static int fpga_i2c_probe(struct i2c_client *i2c)
         /* gowinxxxx->type = id->driver_data; */
 	/* printk(KERN_INFO "ID: %s", id->name); */
 
-	regmap_read(gowinxxxx->regmap, 0x00, &regval);
-	printk(KERN_INFO "Reading from the the chip %02x", regval);
+	/* printk(KERN_INFO "Reading from the the chip %02x", regval); */
 
+	// Configuring the chip on start
+	printk(KERN_INFO "Setting up the number of filtertaps for the FPGA codec");
+	regmap_write(gowinxxxx->regmap, FPGA_FILTER_TAPS_LSB, 0xFF);
+	regmap_write(gowinxxxx->regmap, FPGA_FILTER_TAPS_MSB, 0x0F);
+
+	// Configuring the default state IO state for the block RAM
+
+	// Registering the audio component to ALSA
 	printk(KERN_INFO "Registering device");
 	ret = devm_snd_soc_register_component(&i2c->dev,
 					      &soc_component_dev_fpga, &fpga_dai, 1);

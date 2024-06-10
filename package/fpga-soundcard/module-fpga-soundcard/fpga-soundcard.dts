@@ -24,34 +24,18 @@
 
                 p_cpu_dai: cpu {
                     sound-dai = <&i2s>;
-
-					/* TDM slot configuration - BCLK ratio: 64 x Fs (2 x 32 bit) */
                     dai-tdm-slot-num = <2>;
                     dai-tdm-slot-width = <32>;
-
                 };
 
                 p_codec_dai: codec {
-                    sound-dai = <&codec_out>;
+                    sound-dai = <&GW5ALV25MG121>;
                 };
             };
         };
     };
 
     fragment@1 {
-        target-path = "/";
-        __overlay__ {
-            codec_out: spdif-transmitter {
-                #address-cells = <0>;
-                #size-cells = <0>;
-                #sound-dai-cells = <0>;
-                compatible = "flatmax,bare";
-                status = "okay";
-            };
-        };
-    };
-
-    fragment@2 {
         target = <&i2s>;
         __overlay__ {
             #sound-dai-cells = <0>;
@@ -59,7 +43,7 @@
         };
     };
 
-    fragment@4{
+    fragment@2{
 	target= <&i2c1>;
 	__overlay__ {
             #address-cells = <1>;
@@ -67,11 +51,12 @@
             #size-cells = <0>;
 	    status = "okay";
 
-	    GW5A-LV25MG121@13 {
+	    GW5ALV25MG121: codec@13 {
                 #sound-dai-cells = <0>;
 		compatible = "flatmax,bare";
 		reg = <0x13>;
 		status = "okay";
+		/* clocks =<&>; */
 	    };
 	};
     };

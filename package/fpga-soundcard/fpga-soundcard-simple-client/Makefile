@@ -1,7 +1,7 @@
 PROJECT_DIR := $(shell pwd)
 PROM	= simple_filter_client
 
-CFLAGS ?= -fPIC -O3 -I$(PROJECT_DIR) -lpthread -lasound
+CFLAGS ?= -fPIC -O0 -I$(PROJECT_DIR) -lpthread -lasound -g3
 OBJ = main.o
 
 $(PROM): $(OBJ)	

@@ -10,7 +10,6 @@ modprobe snd-soc-simple-card
 modprobe snd-soc-bcm2835-i2s
 modprobe regmap-i2c
 insmod ./snd-soc-fpga-codec.ko
-modprobe snd-soc-spdif-tx
 
 rmmod snd_soc_simple_card
 rmmod snd_soc_fpga_codec
@@ -24,6 +23,7 @@ Starting serial debugging:
 # On target machine
 modprobe snd-soc-simple-card
 modprobe snd-soc-bcm2835-i2s
+modprobe regmap-i2c
 insmod ./snd-soc-fpga-codec.ko
 
 echo ttyAMA0 > /sys/module/kgdboc/parameters/kgdboc
@@ -36,12 +36,9 @@ set logging enabled on
 set serial baud 115200
 target remote /dev/ttyUSB0
 lx-symbols /home/gabriel/Documents/Projects/buildroot/output/build/fpga-soundcard-0.0.1/module-fpga-soundcard/
-break fpga-codec.c:149
+break fpga-codec.c:111
 
 continue
-
-break main.c:1292
-break main.c:2477
 
 # On target mahcine
 rmmod snd_soc_simple_card
@@ -54,7 +51,10 @@ insmod ./snd-soc-fpga-codec.ko
 Debugging loadble kernel modules with with kgdb:
 https://stackoverflow.com/questions/6260927/module-debugging-through-kgdb
 
-
+Debugging using gbserver
+```bash
+./output/host/bin/arm-buildroot-linux-gnueabihf-gdb ./output/build/fpga-soundcard-0.0.1/fpga-soundcard-simple-client/simple_filter_client -tui -ex "target remote | ssh -T root@buildroot.local gdbserver - /root/simple_filter_client"
+```
 # People with similar issues to yours
 https://community.nxp.com/t5/i-MX-Processors/iMX6DL-with-SGTL5000-codec-ALSA-doesn-t-find-soundcard/m-p/272887
 Logs with the I2C function:

@@ -65,6 +65,7 @@ BR2_PACKAGE_HOST_GDB_PYTHON3=y
 BR2_PACKAGE_GDB=y
 BR2_PACKAGE_GDB_SERVER=y
 BR2_PACKAGE_RPI_FIRMWARE_INSTALL_VCDBG=y
+BR2_PACKAGE_STRACE=y
 
 # Enabling some ssh utilities
 BR2_ROOTFS_OVERLAY="/home/gabriel/Documents/Projects/buildroot.rockchip.ext/overlays"
