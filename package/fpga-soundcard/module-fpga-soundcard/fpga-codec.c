@@ -81,9 +81,9 @@ static const struct regmap_config gowinxxxx_regmap = {
     .val_bits = 8,
 
     .max_register = 0xFFFF,
-    .reg_defaults = gowinxxxx_defaults,
-    .num_reg_defaults = ARRAY_SIZE(gowinxxxx_defaults),
-    .cache_type = REGCACHE_FLAT,
+    /* .reg_defaults = gowinxxxx_defaults, */
+    /* .num_reg_defaults = ARRAY_SIZE(gowinxxxx_defaults), */
+    /* .cache_type = REGCACHE_FLAT, */
 };
 
 static struct snd_soc_dai_driver fpga_dai = {
@@ -110,9 +110,14 @@ static int fpga_coefficient_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	/* struct custom_strucct *myStruct = snd_soc_component_get_drvdata(component); */
+
 	unsigned int read_value;
 
+	// Making sure that the FPGA is in read mode
 	regmap_write(component->regmap, FPGA_INS_REG, 0x00);
+
+	// Checking how many coefficients we can actually access
 
 	// This part writes on the address registers
 	regmap_write(component->regmap, FPGA_ADDR_BUFF_LSB, (int)ucontrol->value.bytes.data[0]);
@@ -120,17 +125,15 @@ static int fpga_coefficient_get(struct snd_kcontrol *kcontrol,
 	regmap_write(component->regmap, FPGA_ADDR_BUFF_HMB, (int)ucontrol->value.bytes.data[2]);
 	regmap_write(component->regmap, FPGA_ADDR_BUFF_MSB, (int)ucontrol->value.bytes.data[3]);
 
-
 	// This part reads on the data registers
-	regmap_write(component->regmap, FPGA_INS_REG, 0x00);
 	regmap_read(component->regmap, FPGA_DATA_BUFF_LSB, &read_value);
-	ucontrol->value.bytes.data[0] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[4] = (unsigned char)read_value;
 	regmap_read(component->regmap, FPGA_DATA_BUFF_LMB, &read_value);
-	ucontrol->value.bytes.data[1] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[5] = (unsigned char)read_value;
 	regmap_read(component->regmap, FPGA_DATA_BUFF_HMB, &read_value);
-	ucontrol->value.bytes.data[2] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[6] = (unsigned char)read_value;
 	regmap_read(component->regmap, FPGA_DATA_BUFF_MSB, &read_value);
-	ucontrol->value.bytes.data[3] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[7] = (unsigned char)read_value;
 
   return 0;
 }
@@ -142,6 +145,8 @@ static int fpga_coefficient_put(struct snd_kcontrol *kcontrol,
 
 	// Making sure that the FPGA is in write mode
 	regmap_write(component->regmap, FPGA_INS_REG, 0x01);
+
+	// Checking how many coefficients we can actually access
 
 	// This part writes on the data registers
 	regmap_write(component->regmap, FPGA_DATA_BUFF_LSB, ucontrol->value.bytes.data[4]);
@@ -164,7 +169,7 @@ static int fpga_coefficient_info(struct snd_kcontrol *kcontrol,
   return 0;
 }
 
-#define FPGA_FILTER_COEFFICIENTS_VALUES(xname, xcount, xmin, xmax) \
+#define FPGA_FILTER_COEFFICIENTS_VALUES(xname) \
  {	.iface = SNDRV_CTL_ELEM_IFACE_CARD, \
 	.name = xname, \
 	.info = fpga_coefficient_info, \
@@ -172,17 +177,48 @@ static int fpga_coefficient_info(struct snd_kcontrol *kcontrol,
 	.put  = fpga_coefficient_put, \
 	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE }
 
-/* #define FPGA_FILTER_COEFFICIENTS_NUMBER(xname, xcount, xmin, xmax) \ */
-/*  {	.iface = SNDRV_CTL_ELEM_IFACE_CARD, \ */
-/* 	.name = xname, \ */
-/* 	.info = , \ */
-/* 	.get  = , \ */
-/* 	.put  = , \ */
-/* 	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE } */
+
+
+static int fpga_coefficient_number_info(struct snd_kcontrol *kcontrol,
+                                 struct snd_ctl_elem_info *uinfo) {
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	int read_value;
+	uinfo->type=SNDRV_CTL_ELEM_TYPE_INTEGER;
+
+	regmap_read(component->regmap, FPGA_FILTER_TAPS_LSB, &read_value);
+        uinfo->value.integer.max &= ~(0xFF);
+        uinfo->value.integer.max |= (unsigned char)read_value;
+	regmap_read(component->regmap, FPGA_FILTER_TAPS_MSB, &read_value);
+        uinfo->value.integer.max &= ~(0xFF<<8);
+        uinfo->value.integer.max |= ((unsigned char)read_value << 8);
+
+        uinfo->value.integer.min  = 0x00;
+        uinfo->value.integer.step = 0x04;
+	return 0;
+}
+
+static int fpga_coefficient_number_get(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol) {
+  return 0;
+}
+
+static int fpga_coefficient_number_put(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol) {
+  return 0;
+}
+
+#define FPGA_FILTER_COEFFICIENTS_NUMBER(xname) \
+ {	.iface = SNDRV_CTL_ELEM_IFACE_CARD, \
+	.name = xname, \
+	.info = fpga_coefficient_number_info, \
+	.get  = fpga_coefficient_number_get, \
+	.put  = fpga_coefficient_number_put, \
+	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE }
 
 
 static struct snd_kcontrol_new fpga_filter_controls[] = {
-        FPGA_FILTER_COEFFICIENTS_VALUES("FPGA FIR Coefficients Values", 0, 20, 5)
+  FPGA_FILTER_COEFFICIENTS_VALUES("FPGA FIR Coefficients Values"),
+  FPGA_FILTER_COEFFICIENTS_NUMBER("FPGA FIR Coefficients Number")
 };
 
 static struct snd_soc_component_driver soc_component_dev_fpga = {
