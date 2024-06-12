@@ -132,6 +132,36 @@ int read_sample_coefficients_to_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  
   return 0;
 }
 
+int check_controls(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t *value)
+{
+  int err;
+  unsigned char* reading_result = malloc(4*sizeof(unsigned char));
+
+  snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
+  snd_ctl_elem_id_set_name(id, "FPGA FIR General Controls");
+  if ((err = lookup_id(id, handle)) < 0){
+    return err;
+  }
+
+  snd_ctl_elem_value_set_id(value, id);
+
+  // Verify by getting the ID from the value structure
+  fprintf(stderr, "Control element name set to: %s\n", snd_ctl_elem_id_get_name(id));
+  fprintf(stderr, "Control element numid set to: %u\n", snd_ctl_elem_id_get_numid(id));
+
+  if ((err = snd_ctl_elem_read(handle, value)) < 0) {
+    fprintf(stderr, "Control element read error: %s\n",
+	    snd_strerror(err));
+    return err;
+  }
+
+  memcpy(reading_result, (unsigned char*)snd_ctl_elem_value_get_bytes(value), 4*sizeof(unsigned char));
+
+  fprintf(stderr, "State of the filter (on=1, off=0): %d\n", (int)(*reading_result & 0x01));
+
+  return 0;
+}
+
 int main(int argc, char *argv[]){
   int err;
   snd_ctl_t *handle;
@@ -157,30 +187,29 @@ int main(int argc, char *argv[]){
   /*   return -1; */
   /* } */
 
-  snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
-  snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Number");
-  if ((err = lookup_id(id, handle)) < 0){
-    return err;
-  }
-
-  snd_ctl_elem_info_alloca(&info);
-  snd_ctl_elem_info_set_id(info, id);
-
-  if ((err = snd_ctl_elem_info(handle, info)) < 0) {
-    fprintf(stderr, "Cannot get element info: %s\n", snd_strerror(err));
-    return -1;
-  }
-  
-  fprintf(stderr,"Max address you can access in BRAM: 0x%08lx\n", snd_ctl_elem_info_get_max(info)-1);
-  fprintf(stderr,"Min address you can access in BRAM: 0x%08lx\n", snd_ctl_elem_info_get_min(info));
-  fprintf(stderr,"Number of bytes per sample in BRAM: %lx\n", snd_ctl_elem_info_get_step(info));
-
-  /* if ((err = snd_ctl_elem_read(handle, value)) < 0) { */
-  /*   fprintf(stderr, "Control element read error: %s\n", */
-  /* 	    snd_strerror(err)); */
+  /* snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD); */
+  /* snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Number"); */
+  /* if ((err = lookup_id(id, handle)) < 0){ */
   /*   return err; */
   /* } */
 
+  /* snd_ctl_elem_info_alloca(&info); */
+  /* snd_ctl_elem_info_set_id(info, id); */
+
+  /* if ((err = snd_ctl_elem_info(handle, info)) < 0) { */
+  /*   fprintf(stderr, "Cannot get element info: %s\n", snd_strerror(err)); */
+  /*   return -1; */
+  /* } */
+  
+  /* fprintf(stderr,"Max address you can access in BRAM: 0x%08lx\n", snd_ctl_elem_info_get_max(info)-1); */
+  /* fprintf(stderr,"Min address you can access in BRAM: 0x%08lx\n", snd_ctl_elem_info_get_min(info)); */
+  /* fprintf(stderr,"Number of bytes per sample in BRAM: %lx\n", snd_ctl_elem_info_get_step(info)); */
+
+  if (check_controls(handle, id, value) != 0) {
+    fprintf(stderr, "The program terminated unexpectedly: Couldn't read the general controls from the FPGA\n");
+    return -1;
+  }
+  
   // Free allocated memory
   snd_ctl_elem_id_clear(id);
   snd_ctl_elem_value_clear(value);

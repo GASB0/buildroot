@@ -16,6 +16,8 @@
 #include <linux/clk.h>
 
 // Definition of some important registers for our board configuration
+#define FPGA_POWER_REG                  0x00
+
 #define FPGA_FILTER_TAPS_LSB	        0x30
 #define FPGA_FILTER_TAPS_MSB	        0x31
 
@@ -166,6 +168,7 @@ static int fpga_coefficient_put(struct snd_kcontrol *kcontrol,
 static int fpga_coefficient_info(struct snd_kcontrol *kcontrol,
                                  struct snd_ctl_elem_info *uinfo)
 {
+  // Think of something you could put in here...
   return 0;
 }
 
@@ -199,12 +202,26 @@ static int fpga_coefficient_number_info(struct snd_kcontrol *kcontrol,
 
 static int fpga_coefficient_number_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol) {
-  return 0;
+  // This function more or less provides the same information as the .info method
+  // so we can remove this or something in the future
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+        int read_value;
+	regmap_read(component->regmap, FPGA_DATA_BUFF_LSB, &read_value);
+	ucontrol->value.bytes.data[0] = (unsigned char)read_value;
+	regmap_read(component->regmap, FPGA_DATA_BUFF_LMB, &read_value);
+	ucontrol->value.bytes.data[1] = (unsigned char)read_value;
+
+	return 0;
 }
 
 static int fpga_coefficient_number_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol) {
-  return 0;
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+
+	regmap_write(component->regmap, FPGA_FILTER_TAPS_LSB, (int)ucontrol->value.bytes.data[0]);
+	regmap_write(component->regmap, FPGA_FILTER_TAPS_MSB, (int)ucontrol->value.bytes.data[1]);
+
+	return 0;
 }
 
 #define FPGA_FILTER_COEFFICIENTS_NUMBER(xname) \
@@ -216,9 +233,43 @@ static int fpga_coefficient_number_put(struct snd_kcontrol *kcontrol,
 	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE }
 
 
+static int fpga_general_controls_put(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol) {
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+
+	regmap_write(component->regmap, FPGA_POWER_REG, (int)ucontrol->value.bytes.data[0]);
+
+	return 0;
+}
+
+static int fpga_general_controls_get(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol) {
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+
+	int read_value;
+	regmap_read(component->regmap, FPGA_POWER_REG, &read_value);
+	ucontrol->value.bytes.data[0] = (unsigned char)(read_value & 0xFF);
+	
+	return 0;
+}
+
+static int fpga_general_controls_info(struct snd_kcontrol *kcontrol,
+                                 struct snd_ctl_elem_info *uinfo) {
+	return 0;
+}
+
+#define FPGA_FILTER_GENERAL_CONTROLS(xname) \
+ {	.iface = SNDRV_CTL_ELEM_IFACE_CARD, \
+	.name = xname, \
+        .info = fpga_general_controls_info, \
+	.get  = fpga_general_controls_get, \
+	.put  = fpga_general_controls_put, \
+	.access = SNDRV_CTL_ELEM_ACCESS_READWRITE }
+
 static struct snd_kcontrol_new fpga_filter_controls[] = {
   FPGA_FILTER_COEFFICIENTS_VALUES("FPGA FIR Coefficients Values"),
-  FPGA_FILTER_COEFFICIENTS_NUMBER("FPGA FIR Coefficients Number")
+  FPGA_FILTER_COEFFICIENTS_NUMBER("FPGA FIR Coefficients Number"),
+  FPGA_FILTER_GENERAL_CONTROLS("FPGA FIR General Controls")
 };
 
 static struct snd_soc_component_driver soc_component_dev_fpga = {
