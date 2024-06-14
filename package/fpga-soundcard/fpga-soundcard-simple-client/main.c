@@ -2,6 +2,12 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <alsa/asoundlib.h>
+#include "error.h"
+#include <sys/types.h>
+#include <strings.h>
+#include <getopt.h>
+
+#define PROGRAM_NAME "simple_filter_client"
 
 
 int lookup_id(snd_ctl_elem_id_t *id, snd_ctl_t *handle)
@@ -20,32 +26,81 @@ int lookup_id(snd_ctl_elem_id_t *id, snd_ctl_t *handle)
 	return 0;
 }
 
-int write_sample_coefficients_from_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t *value, const char* file_name) {
+int get_max_addr(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t *value){
+  int err;
+  int maxAddr;
+  snd_ctl_elem_info_t *info;  
+  snd_ctl_elem_info_alloca(&info);
+
+  snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
+  snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Number");
+
+  if ((err = lookup_id(id, handle)) < 0){
+    return err;
+  }
+
+  snd_ctl_elem_info_alloca(&info);
+  snd_ctl_elem_info_set_id(info, id);
+
+  if ((err = snd_ctl_elem_info(handle, info)) < 0) {
+    fprintf(stderr, "Cannot get element info: %s\n", snd_strerror(err));
+    return -1;
+  }
+  
+  maxAddr = snd_ctl_elem_info_get_max(info);
+
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
+  
+  return maxAddr;
+}
+
+int write_sample_coefficients_from_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t *value, const char* file_name, int ncoefficients) {
 	int err;
 	char* data = (char*)malloc(8*sizeof(char));
 	char read_byte;
 	int bytes_read;
+	long int file_size;
 	FILE *fp;
 	uint32_t bram_addr = 0x00000000;
+	int maxAddr=get_max_addr(handle, id, value);
 
-	snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
-	snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Values");
-	if ((err = lookup_id(id, handle)) < 0){
-	    return err;
-	}
-
+	// Opening the file
 	if ((fp = fopen(file_name,"r")) == NULL) {
             fprintf(stderr, "Couldn't open the file you are requesting");
 	    return -1;
 	}
 
-	snd_ctl_elem_value_set_id(value, id);
+	// Getting the size of the file in bytes
+	fseek(fp, 0, SEEK_END);
+	file_size=ftell(fp);
+	fseek(fp, 0, SEEK_SET);
 
-	// Verify by getting the ID from the value structure
+	// Setting the control to manipulate coefficient values
+	snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Values");
+	snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
+
+	if ((err = lookup_id(id, handle)) < 0){
+	    return err;
+	}
+
+	snd_ctl_elem_value_set_id(value, id);
         fprintf(stderr, "Control element name set to: %s\n", snd_ctl_elem_id_get_name(id));
         fprintf(stderr, "Control element numid set to: %u\n", snd_ctl_elem_id_get_numid(id));
+	
+	// Checking that the number of coefficients can by set into the FPGA
+	if(ncoefficients > maxAddr){
+	  fprintf(stderr, "You are trying to write more coefficients into the FPGA than it has configured\n");
+	  return -1;
+	}
 
-        fprintf(stderr, "Reading coefficients file, this can take a while...\n");
+	if(ncoefficients > file_size/4){
+	  fprintf(stderr, "You are trying to write more coefficients into the FPGA than available in your file\n");
+	  return -1;
+	}
+
+	// Performing the writing of the coefficients from file to FPGA
+        fprintf(stderr, "Reading coefficients file and writing into FPGA, this can take a while...\n");
 	while(1) {
 	  data[0] = (bram_addr >> 0)  & 0xFF; // LSB
 	  data[1] = (bram_addr >> 8)  & 0xFF;
@@ -69,44 +124,60 @@ int write_sample_coefficients_from_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id
 	  }
 
 	  // Writing bytes to codec control
-	  snd_ctl_elem_set_bytes(value, data, sizeof(data));
+	  snd_ctl_elem_set_bytes(value, data, 8*sizeof(char));
 	  if ((err = snd_ctl_elem_write(handle, value)) < 0) {
 	    fprintf(stderr, "Control element write error: %s\n",
 		    snd_strerror(err));
 	    return err;
 	  }
 
+	  if ((int)bram_addr == ncoefficients)
+	    break;
+
 	  bram_addr++;
 	}
 
 	fclose(fp);
+	snd_ctl_elem_id_clear(id);
+	snd_ctl_elem_value_clear(value);
 	free(data);
+
 	return 0;
 }
 
-int read_sample_coefficients_to_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t *value, const char* file_name) {
+int read_sample_coefficients_to_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t *value, const char* file_name, int ncoefficients) {
   int err;
   unsigned char* data = malloc(8*sizeof(unsigned char));
   unsigned char* reading_result = malloc(4*sizeof(unsigned char));
   uint32_t bram_addr = 0x00000000;
-  /* uint32_t bram_addr = 0x0000AABB; */
+  size_t bytes_written;
+  int maxAddr=get_max_addr(handle, id, value);
   FILE *fp;
 
-  snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
-  snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Values");
-  if ((err = lookup_id(id, handle)) < 0){
-    return err;
-  }
-
+  // Opening the file
   if ((fp=fopen(file_name, "w")) == NULL){
     fprintf(stderr, "Couldn't open the file you are requesting");
     return -1;
   }
 
-  snd_ctl_elem_value_set_id(value, id);
+  // Checking the number of coefficients you can actually write
+  snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
+  snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Values");
+
+  if ((err = lookup_id(id, handle)) < 0){
+    return err;
+  }
+
   // Verify by getting the ID from the value structure
+  snd_ctl_elem_value_set_id(value, id);
   fprintf(stderr, "Control element name set to: %s\n", snd_ctl_elem_id_get_name(id));
   fprintf(stderr, "Control element numid set to: %u\n", snd_ctl_elem_id_get_numid(id));
+
+  // Checking that the number of coefficients can by set into the FPGA
+  if(ncoefficients > maxAddr){
+    fprintf(stderr, "You are trying to write more coefficients into the FPGA than it has configured\n");
+    return -1;
+  }
 
   fprintf(stderr, "Writing coefficients from FPGA to file, this can take a while...\n");
   while(1){
@@ -124,10 +195,22 @@ int read_sample_coefficients_to_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  
     }
 	
     memcpy(reading_result, (unsigned char*)snd_ctl_elem_value_get_bytes(value)+4, 4*sizeof(unsigned char));
-    printf("%c", *(reading_result+0));
+
+    bytes_written=fwrite(reading_result, sizeof(char), 4, fp);
+    if(bytes_written!=4){
+      return -1;
+    }
+
+    if ((int)bram_addr == ncoefficients)
+      break;
+
     bram_addr++;
   }
 
+  fclose(fp);
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
+  free(data);
 
   return 0;
 }
@@ -162,12 +245,23 @@ int check_controls(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value
   return 0;
 }
 
+void print_help() {
+    printf("Usage: %s [-h] [-n coeffNum -rw filename] \n", PROGRAM_NAME);
+    printf("  -h           Display this help message\n");
+    printf("  -i           Check general controls of the codec\n");
+    printf("  -n           Set the number of coefficients to either read or write from the codec\n");
+    printf("  -r           Reads n filter coefficients from codec to $filename\n");
+    printf("  -w           Writes n filter coefficients to the codec from $filename\n");
+}
+
 int main(int argc, char *argv[]){
-  int err;
+  int err, opt;
+  int ncoefficients;
+  char *filename = NULL;
+
   snd_ctl_t *handle;
   snd_ctl_elem_id_t *id;
   snd_ctl_elem_value_t *value;
-  snd_ctl_elem_info_t *info;
 
   snd_ctl_elem_id_alloca(&id);
   snd_ctl_elem_value_alloca(&value);
@@ -177,37 +271,27 @@ int main(int argc, char *argv[]){
     return err;
   }
 
-  /* if (write_sample_coefficients_from_file(handle, id, value, "./filter_file.bin") !=0 ) { */
-  /*   fprintf(stderr, "The program terminated unexpectedly: Couldn't write the whole bin file to the FPGA"); */
-  /*   return -1; */
-  /* } */
-
-  /* if (read_sample_coefficients_to_file(handle, id, value, "./read_file.bin") != 0) { */
-  /*   fprintf(stderr, "The program terminated unexpectedly: Couldn't read the coefficients from the FPGA to a file"); */
-  /*   return -1; */
-  /* } */
-
-  /* snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD); */
-  /* snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Number"); */
-  /* if ((err = lookup_id(id, handle)) < 0){ */
-  /*   return err; */
-  /* } */
-
-  /* snd_ctl_elem_info_alloca(&info); */
-  /* snd_ctl_elem_info_set_id(info, id); */
-
-  /* if ((err = snd_ctl_elem_info(handle, info)) < 0) { */
-  /*   fprintf(stderr, "Cannot get element info: %s\n", snd_strerror(err)); */
-  /*   return -1; */
-  /* } */
-  
-  /* fprintf(stderr,"Max address you can access in BRAM: 0x%08lx\n", snd_ctl_elem_info_get_max(info)-1); */
-  /* fprintf(stderr,"Min address you can access in BRAM: 0x%08lx\n", snd_ctl_elem_info_get_min(info)); */
-  /* fprintf(stderr,"Number of bytes per sample in BRAM: %lx\n", snd_ctl_elem_info_get_step(info)); */
-
-  if (check_controls(handle, id, value) != 0) {
-    fprintf(stderr, "The program terminated unexpectedly: Couldn't read the general controls from the FPGA\n");
-    return -1;
+  while ((opt=getopt(argc, argv, "hin:r:w:")) != -1){
+    switch(opt){
+    case 'h':
+      print_help();
+      break;
+    case 'i':
+      check_controls(handle, id, value);
+      break;
+    case 'n':
+      ncoefficients = atoi(optarg);
+      break;
+    case 'r':
+      read_sample_coefficients_to_file(handle, id, value, optarg, ncoefficients);
+      break;
+    case 'w':
+      write_sample_coefficients_from_file(handle, id, value, optarg, ncoefficients);
+      break;
+    default:
+      print_help();
+      exit(EXIT_FAILURE);
+    }
   }
   
   // Free allocated memory
