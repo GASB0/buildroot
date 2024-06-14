@@ -129,13 +129,13 @@ static int fpga_coefficient_get(struct snd_kcontrol *kcontrol,
 
 	// This part reads on the data registers
 	regmap_read(component->regmap, FPGA_DATA_BUFF_LSB, &read_value);
-	ucontrol->value.bytes.data[4] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[4] = (unsigned char)read_value & 0xFF;
 	regmap_read(component->regmap, FPGA_DATA_BUFF_LMB, &read_value);
-	ucontrol->value.bytes.data[5] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[5] = (unsigned char)read_value & 0xFF;
 	regmap_read(component->regmap, FPGA_DATA_BUFF_HMB, &read_value);
-	ucontrol->value.bytes.data[6] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[6] = (unsigned char)read_value & 0xFF;
 	regmap_read(component->regmap, FPGA_DATA_BUFF_MSB, &read_value);
-	ucontrol->value.bytes.data[7] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[7] = (unsigned char)read_value & 0xFF;
 
   return 0;
 }
@@ -195,6 +195,8 @@ static int fpga_coefficient_number_info(struct snd_kcontrol *kcontrol,
         uinfo->value.integer.max &= ~(0xFF<<8);
         uinfo->value.integer.max |= ((unsigned char)read_value << 8);
 
+        uinfo->value.integer.max &= ~(0xFFFF<<16);
+
         uinfo->value.integer.min  = 0x00;
         uinfo->value.integer.step = 0x04;
 	return 0;
@@ -207,9 +209,9 @@ static int fpga_coefficient_number_get(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
         int read_value;
 	regmap_read(component->regmap, FPGA_DATA_BUFF_LSB, &read_value);
-	ucontrol->value.bytes.data[0] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[0] = (unsigned char)(read_value & 0xFF);
 	regmap_read(component->regmap, FPGA_DATA_BUFF_LMB, &read_value);
-	ucontrol->value.bytes.data[1] = (unsigned char)read_value;
+	ucontrol->value.bytes.data[1] = (unsigned char)(read_value & 0xFF);
 
 	return 0;
 }

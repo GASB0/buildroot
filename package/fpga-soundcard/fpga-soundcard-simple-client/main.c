@@ -32,6 +32,8 @@ int get_max_addr(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t
   snd_ctl_elem_info_t *info;  
   snd_ctl_elem_info_alloca(&info);
 
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
   snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
   snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Number");
 
@@ -51,7 +53,6 @@ int get_max_addr(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t
 
   snd_ctl_elem_id_clear(id);
   snd_ctl_elem_value_clear(value);
-  
   return maxAddr;
 }
 
@@ -77,6 +78,8 @@ int write_sample_coefficients_from_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id
 	fseek(fp, 0, SEEK_SET);
 
 	// Setting the control to manipulate coefficient values
+	snd_ctl_elem_id_clear(id);
+	snd_ctl_elem_value_clear(value);
 	snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Values");
 	snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
 
@@ -161,6 +164,8 @@ int read_sample_coefficients_to_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  
   }
 
   // Checking the number of coefficients you can actually write
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
   snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
   snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Values");
 
@@ -194,7 +199,7 @@ int read_sample_coefficients_to_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  
       return err;
     }
 	
-    memcpy(reading_result, (unsigned char*)snd_ctl_elem_value_get_bytes(value)+4, 4*sizeof(unsigned char));
+    memcpy(reading_result, ((unsigned char*)snd_ctl_elem_value_get_bytes(value))+4, 4*sizeof(unsigned char));
 
     bytes_written=fwrite(reading_result, sizeof(char), 4, fp);
     if(bytes_written!=4){
@@ -220,6 +225,8 @@ int check_controls(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value
   int err;
   unsigned char* reading_result = malloc(4*sizeof(unsigned char));
 
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
   snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
   snd_ctl_elem_id_set_name(id, "FPGA FIR General Controls");
   if ((err = lookup_id(id, handle)) < 0){
@@ -229,8 +236,8 @@ int check_controls(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value
   snd_ctl_elem_value_set_id(value, id);
 
   // Verify by getting the ID from the value structure
-  fprintf(stderr, "Control element name set to: %s\n", snd_ctl_elem_id_get_name(id));
-  fprintf(stderr, "Control element numid set to: %u\n", snd_ctl_elem_id_get_numid(id));
+  /* fprintf(stderr, "Control element name set to: %s\n", snd_ctl_elem_id_get_name(id)); */
+  /* fprintf(stderr, "Control element numid set to: %u\n", snd_ctl_elem_id_get_numid(id)); */
 
   if ((err = snd_ctl_elem_read(handle, value)) < 0) {
     fprintf(stderr, "Control element read error: %s\n",
@@ -241,7 +248,10 @@ int check_controls(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value
   memcpy(reading_result, (unsigned char*)snd_ctl_elem_value_get_bytes(value), 4*sizeof(unsigned char));
 
   fprintf(stderr, "State of the filter (on=1, off=0): %d\n", (int)(*reading_result & 0x01));
+  fprintf(stderr, "Max address you can access: 0x%04x\n", get_max_addr(handle, id, value));
 
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
   return 0;
 }
 
@@ -256,7 +266,7 @@ void print_help() {
 
 int main(int argc, char *argv[]){
   int err, opt;
-  int ncoefficients;
+  int ncoefficients = -1;
   char *filename = NULL;
 
   snd_ctl_t *handle;
