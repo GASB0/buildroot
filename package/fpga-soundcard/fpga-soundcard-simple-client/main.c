@@ -26,6 +26,36 @@ int lookup_id(snd_ctl_elem_id_t *id, snd_ctl_t *handle)
 	return 0;
 }
 
+int set_max_addr(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_t *value, int ncoefficients) {
+  int err;
+  int data = ncoefficients & ~(0xFFFF<<16);
+  snd_ctl_elem_info_t *info;  
+  snd_ctl_elem_info_alloca(&info);
+
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
+  snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
+  snd_ctl_elem_id_set_name(id, "FPGA FIR Coefficients Number");
+
+  if ((err = lookup_id(id, handle)) < 0){
+    return err;
+  }
+
+  snd_ctl_elem_value_set_id(value, id);
+
+  // Writing bytes to codec control
+  snd_ctl_elem_set_bytes(value, &data, 2);
+  if ((err = snd_ctl_elem_write(handle, value)) < 0) {
+    fprintf(stderr, "Control element write error: %s\n",
+	    snd_strerror(err));
+    return err;
+  }
+
+  snd_ctl_elem_id_clear(id);
+  snd_ctl_elem_value_clear(value);
+  return 0;
+}
+
 int get_max_addr(snd_ctl_t *handle, snd_ctl_elem_id_t *id,  snd_ctl_elem_value_t *value){
   int err;
   int maxAddr;
@@ -260,6 +290,7 @@ void print_help() {
     printf("  -h           Display this help message\n");
     printf("  -i           Check general controls of the codec\n");
     printf("  -n           Set the number of coefficients to either read or write from the codec\n");
+    printf("  -s           Set max possible accessible address in the FPGA (use the prefix 0x to use hex numbers)\n");
     printf("  -r           Reads n filter coefficients from codec to $filename\n");
     printf("  -w           Writes n filter coefficients to the codec from $filename\n");
 }
@@ -268,6 +299,7 @@ int main(int argc, char *argv[]){
   int err, opt;
   int ncoefficients = -1;
   char *filename = NULL;
+  char *hex_prefix = "0x";
 
   snd_ctl_t *handle;
   snd_ctl_elem_id_t *id;
@@ -281,7 +313,7 @@ int main(int argc, char *argv[]){
     return err;
   }
 
-  while ((opt=getopt(argc, argv, "hin:r:w:")) != -1){
+  while ((opt=getopt(argc, argv, "his:n:r:w:")) != -1){
     switch(opt){
     case 'h':
       print_help();
@@ -291,6 +323,13 @@ int main(int argc, char *argv[]){
       break;
     case 'n':
       ncoefficients = atoi(optarg);
+      break;
+    case 's':
+      if (strncmp(optarg, "0x",2) == 0){
+	set_max_addr(handle, id, value, strtol(optarg+2, NULL, 16));
+      } else {
+	set_max_addr(handle, id, value, atoi(optarg));
+      }
       break;
     case 'r':
       read_sample_coefficients_to_file(handle, id, value, optarg, ncoefficients);
