@@ -1,0 +1,6 @@
+config BR2_PACKAGE_CUSTOM_UART
+        bool "custom-uart"
+        depends on BR2_LINUX_KERNEL
+        help
+          Custom uart driver making use of the MMIO
+
