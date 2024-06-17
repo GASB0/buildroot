@@ -24,3 +24,4 @@ endef
 CUSTOM_UART_POST_INSTALL_TARGET_HOOKS += CUSTOM_UART_INSTALL_MOD
 
 $(eval $(kernel-module))
+$(eval $(generic-package))

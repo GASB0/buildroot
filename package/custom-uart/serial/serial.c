@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
+#include <linux/of.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <asm/io.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 /* Add your code here */
 struct serial_dev {
@@ -10,11 +12,12 @@ struct serial_dev {
 };
 
 static u32 reg_read(struct serial_dev *serial, unsigned int reg) {
-  return readl(serial->regs+4*reg);
+        return readl(serial->regs+4*reg);
 }
 
 static int reg_write(struct serial_dev *serial, u32 val, unsigned int reg) {
-  return writel(val, serial->regs+4*reg);
+        writel(val, serial->regs+4*reg);
+        return 0;
 }
 
 static int serial_probe(struct platform_device *pdev)
