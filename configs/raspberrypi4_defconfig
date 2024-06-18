@@ -48,5 +48,29 @@ BR2_PACKAGE_XZ=y
 BR2_PACKAGE_KMOD=y
 BR2_PACKAGE_HOST_KMOD_XZ=y
 
+# Fragment files
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="/home/gabriel/Documents/Projects/buildroot.rockchip.ext/package/example-module-overlay/module-overlay-rk3308/kernel.fragment"
+
+# Enable debugging tools
+BR2_GDB_VERSION_12=y
+BR2_PACKAGE_HOST_GDB=y
+BR2_PACKAGE_HOST_GDB_TUI=y
+BR2_PACKAGE_HOST_GDB_PYTHON3=y
+BR2_PACKAGE_GDB=y
+BR2_PACKAGE_GDB_SERVER=y
+BR2_PACKAGE_RPI_FIRMWARE_INSTALL_VCDBG=y
+BR2_PACKAGE_STRACE=y
+
+# Support for dtb overlays
+BR2_LINUX_KERNEL_DTB_OVERLAY_SUPPORT=y
+
 # Enabling my custom uart package
 BR2_PACKAGE_CUSTOM_UART=y
+
+# Enabling ssh utilities
+BR2_ROOTFS_OVERLAY="/home/gabriel/Documents/Projects/buildroot.rockchip.ext/overlays"
+BR2_PACKAGE_OPENSSH=y
+
+# Generic configs
+BR2_TARGET_GENERIC_ROOT_PASSWD="pi"
+BR2_PACKAGE_MDNSD=y

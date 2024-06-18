@@ -1,0 +1,17 @@
+/dts-v1/;
+/plugin/;
+
+/{
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&uart2>;
+		__overlay__{
+			compatible = "bootlin,serial";
+			status = "okay";
+			pinctrl-names = "default";
+			clock-frequency = <115200>;
+			pinctrl-0 = <&uart2_gpio0>;
+		};
+	};
+};
