@@ -108,34 +108,104 @@ static struct snd_soc_dai_driver fpga_dai = {
     },
 };
 
+static int fpga_write_address_regs(struct snd_soc_component *component, struct snd_ctl_elem_value *ucontrol) {
+	// This part writes on the address registers
+	if (regmap_write(component->regmap, FPGA_ADDR_BUFF_LSB, (int)ucontrol->value.bytes.data[0]) < 0) {
+	  pr_err("Failed to write FPGA_ADDR_BUFF_LSB\n");
+	  return -EIO;
+	}
+	if (regmap_write(component->regmap, FPGA_ADDR_BUFF_LMB, (int)ucontrol->value.bytes.data[1]) < 0) {
+	  pr_err("Failed to write FPGA_ADDR_BUFF_LMB\n");
+	  return -EIO;
+	}
+	if (regmap_write(component->regmap, FPGA_ADDR_BUFF_HMB, (int)ucontrol->value.bytes.data[2]) < 0) {
+	  pr_err("Failed to write FPGA_ADDR_BUFF_HMB\n");
+	  return -EIO;
+	}
+	if (regmap_write(component->regmap, FPGA_ADDR_BUFF_MSB, (int)ucontrol->value.bytes.data[3]) < 0) {
+	  pr_err("Failed to write FPGA_ADDR_BUFF_MSB\n");
+	  return -EIO;
+	}
+
+	return 0;
+}
+
+static int fpga_read_data_regs(struct snd_soc_component *component, struct snd_ctl_elem_value *ucontrol)
+{
+	unsigned int read_value;
+	// This part reads on the data registers
+	if (regmap_read(component->regmap, FPGA_DATA_BUFF_MSB, &read_value) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_MSB\n");
+	  return -EIO;
+	}
+	ucontrol->value.bytes.data[4] = (unsigned char)(read_value & 0xFF);
+
+	if (regmap_read(component->regmap, FPGA_DATA_BUFF_HMB, &read_value) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_HMB\n");
+	  return -EIO;
+	}
+	ucontrol->value.bytes.data[5] = (unsigned char)(read_value & 0xFF);
+
+	if (regmap_read(component->regmap, FPGA_DATA_BUFF_LMB, &read_value) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_LMB\n");
+	  return -EIO;
+	}
+	ucontrol->value.bytes.data[6] = (unsigned char)(read_value & 0xFF);
+
+	if (regmap_read(component->regmap, FPGA_DATA_BUFF_LSB, &read_value) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_LSB\n");
+	  return -EIO;
+	}
+	ucontrol->value.bytes.data[7] = (unsigned char)(read_value & 0xFF);
+
+        return 0;
+}
+
+static int fpga_write_data_regs(struct snd_soc_component *component, struct snd_ctl_elem_value *ucontrol)
+{
+	if (regmap_write(component->regmap, FPGA_DATA_BUFF_LSB, ucontrol->value.bytes.data[7]) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_LSB\n");
+	  return -EIO;
+	}
+	if (regmap_write(component->regmap, FPGA_DATA_BUFF_LMB, ucontrol->value.bytes.data[6]) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_LMB\n");
+	  return -EIO;
+	}
+	if (regmap_write(component->regmap, FPGA_DATA_BUFF_HMB, ucontrol->value.bytes.data[5]) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_HMB\n");
+	  return -EIO;
+	}
+	if (regmap_write(component->regmap, FPGA_DATA_BUFF_MSB, ucontrol->value.bytes.data[4]) < 0) {
+	  pr_err("Failed to read FPGA_DATA_BUFF_MSB\n");
+	  return -EIO;
+	}
+
+        return 0;
+}
+
 static int fpga_coefficient_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
 	/* struct custom_strucct *myStruct = snd_soc_component_get_drvdata(component); */
 
-	unsigned int read_value;
-
 	// Making sure that the FPGA is in read mode
-	regmap_write(component->regmap, FPGA_INS_REG, 0x00);
+	if (regmap_write(component->regmap, FPGA_INS_REG, 0x00) < 0) {
+	  pr_err("Failed to write FPGA_INS_REG\n");
+	  return -EIO;
+	}
+	
+	// This part writes the address buffer registers
+	if (fpga_write_address_regs(component, ucontrol) < 0) {
+  	  pr_err("Failure while trying to write into the fpga address buffer registers\n");
+	  return -EIO;
+	}
 
-	// Checking how many coefficients we can actually access
-
-	// This part writes on the address registers
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_LSB, (int)ucontrol->value.bytes.data[0]);
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_LMB, (int)ucontrol->value.bytes.data[1]);
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_HMB, (int)ucontrol->value.bytes.data[2]);
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_MSB, (int)ucontrol->value.bytes.data[3]);
-
-	// This part reads on the data registers
-	regmap_read(component->regmap, FPGA_DATA_BUFF_LSB, &read_value);
-	ucontrol->value.bytes.data[4] = (unsigned char)read_value & 0xFF;
-	regmap_read(component->regmap, FPGA_DATA_BUFF_LMB, &read_value);
-	ucontrol->value.bytes.data[5] = (unsigned char)read_value & 0xFF;
-	regmap_read(component->regmap, FPGA_DATA_BUFF_HMB, &read_value);
-	ucontrol->value.bytes.data[6] = (unsigned char)read_value & 0xFF;
-	regmap_read(component->regmap, FPGA_DATA_BUFF_MSB, &read_value);
-	ucontrol->value.bytes.data[7] = (unsigned char)read_value & 0xFF;
+	// This part reads on the data buffer registers
+	if (fpga_read_data_regs(component, ucontrol) < 0) {
+  	  pr_err("Failure while trying to read the the fpga data buffer registers\n");
+	  return -EIO;
+	}
 
   return 0;
 }
@@ -146,21 +216,22 @@ static int fpga_coefficient_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
 
 	// Making sure that the FPGA is in write mode
-	regmap_write(component->regmap, FPGA_INS_REG, 0x01);
-
-	// Checking how many coefficients we can actually access
+	if (regmap_write(component->regmap, FPGA_INS_REG, 0x01) < 0) {
+	  pr_err("Failed to write FPGA_INS_REG\n");
+	  return -EIO;
+	}
 
 	// This part writes on the data registers
-	regmap_write(component->regmap, FPGA_DATA_BUFF_LSB, ucontrol->value.bytes.data[4]);
-	regmap_write(component->regmap, FPGA_DATA_BUFF_LMB, ucontrol->value.bytes.data[5]);
-	regmap_write(component->regmap, FPGA_DATA_BUFF_HMB, ucontrol->value.bytes.data[6]);
-	regmap_write(component->regmap, FPGA_DATA_BUFF_MSB, ucontrol->value.bytes.data[7]);
+	if (fpga_write_data_regs(component, ucontrol) < 0) {
+  	  pr_err("Failure while trying to write into the fpga address buffer registers\n");
+	  return -EIO;
+	}
 
 	// This part writes on the address registers
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_LSB, ucontrol->value.bytes.data[0]);
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_LMB, ucontrol->value.bytes.data[1]);
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_HMB, ucontrol->value.bytes.data[2]);
-	regmap_write(component->regmap, FPGA_ADDR_BUFF_MSB, ucontrol->value.bytes.data[3]);
+	if (fpga_write_address_regs(component, ucontrol) < 0) {
+  	  pr_err("Failure while trying to write the the fpga data buffer registers\n");
+	  return -EIO;
+	}
 
 	return 0;
 }
@@ -336,5 +407,5 @@ static struct i2c_driver fpga_codec_driver = {
 module_i2c_driver(fpga_codec_driver);
 
 MODULE_DESCRIPTION("ASoC FPGA codec driver with I2C interface");
-MODULE_AUTHOR("Gabriel Santos <flatmax@>");
+MODULE_AUTHOR("Gabriel Santos <Deqx@>");
 MODULE_LICENSE("GPL");

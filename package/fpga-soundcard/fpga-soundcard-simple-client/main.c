@@ -91,8 +91,8 @@ int write_sample_coefficients_from_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id
 	char* data = (char*)malloc(8*sizeof(char));
 	char read_byte;
 	int bytes_read;
-	long int file_size;
-	FILE *fp;
+	long int file_size = 0;
+	FILE *fp = NULL;
 	uint32_t bram_addr = 0x00000000;
 	int maxAddr=get_max_addr(handle, id, value);
 
