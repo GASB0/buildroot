@@ -50,6 +50,7 @@
     	#sound-dai-cells = <0>;
             #size-cells = <0>;
 	    status = "okay";
+	    clock-frequency=<400000>;
 
 	    GW5ALV25MG121: codec@13 {
                 #sound-dai-cells = <0>;

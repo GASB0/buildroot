@@ -55,6 +55,9 @@ Debugging using gbserver
 ```bash
 ./output/host/bin/arm-buildroot-linux-gnueabihf-gdb ./output/build/fpga-soundcard-0.0.1/fpga-soundcard-simple-client/simple_filter_client -tui -ex "target remote | ssh -T root@buildroot.local gdbserver - /root/simple_filter_client"
 ```
+# Debugging driver messing up some samples
+For some reason, in the last transmission regmap keeps messing up bytes 7 to 3. Specifically, it keeps zeroing them!
+
 # People with similar issues to yours
 https://community.nxp.com/t5/i-MX-Processors/iMX6DL-with-SGTL5000-codec-ALSA-doesn-t-find-soundcard/m-p/272887
 Logs with the I2C function:

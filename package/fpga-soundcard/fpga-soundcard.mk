@@ -20,6 +20,7 @@ define FPGA_SOUNDCARD_INSTALL_MOD
 	$(INSTALL) -D -m 644 $(@D)/$(FPGA_SOUNDCARD_MODULE_SUBDIRS)/fpga-soundcard.dtbo $(BUILD_DIR)/rpi-firmware-$(RPI_FIRMWARE_VERSION)/boot/overlays/
 
 	scp -rpO $(BUILD_DIR)/fpga-soundcard-$(FPGA_SOUNDCARD_VERSION)/module-fpga-soundcard/snd-soc-fpga-codec.ko root@buildroot.local:/root/
+	scp -rpO $(BUILD_DIR)/fpga-soundcard-$(FPGA_SOUNDCARD_VERSION)/module-fpga-soundcard/fpga-soundcard.dtbo root@buildroot.local:/mnt/overlays/
 endef
 FPGA_SOUNDCARD_POST_INSTALL_TARGET_HOOKS += FPGA_SOUNDCARD_INSTALL_MOD
 
