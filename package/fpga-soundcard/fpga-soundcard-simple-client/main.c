@@ -86,9 +86,45 @@ int get_max_addr(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_t 
 	return maxAddr;
 }
 
+int turn_codec_on_off(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_t *value, const char * power) {
+        int err;
+
+	snd_ctl_elem_id_clear(id);
+	snd_ctl_elem_value_clear(value);
+	snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
+	snd_ctl_elem_id_set_name(id, "FPGA FIR General Controls");
+
+	if ((err = lookup_id(id, handle)) < 0) {
+		return err;
+	}
+
+	snd_ctl_elem_value_set_id(value, id);
+
+
+	// Writing bytes to codec control
+	if(strcmp(power, "on")==0) {
+	  snd_ctl_elem_set_bytes(value, "turn_codec_on", 13*sizeof(char));
+	} else if(strcmp(power, "off")==0){
+	  snd_ctl_elem_set_bytes(value, "turn_codec_off", 14*sizeof(char));
+	} else {
+	  fprintf(stderr, "Not valid on/off string!\n");
+	  return -1;
+	}
+
+	if ((err = snd_ctl_elem_write(handle, value)) < 0) {
+		fprintf(stderr, "Control element write error: %s\n", snd_strerror(err));
+		return err;
+	}
+
+	snd_ctl_elem_id_clear(id);
+	snd_ctl_elem_value_clear(value);
+        return 0;
+}
+
+
 int wipe_coefficients(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_t *value) {
         int err;
-       	unsigned char *data = (unsigned char *)malloc(17*sizeof(unsigned char));
+       	char *data = (char *)malloc(18*sizeof(char));
 	if (strcpy(data, "wipe_coefficients") == NULL) {
       	  return -1;
 	}
@@ -295,10 +331,6 @@ int check_controls(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_
 
 	snd_ctl_elem_value_set_id(value, id);
 
-	// Verify by getting the ID from the value structure
-	/* fprintf(stderr, "Control element name set to: %s\n", snd_ctl_elem_id_get_name(id)); */
-	/* fprintf(stderr, "Control element numid set to: %u\n", snd_ctl_elem_id_get_numid(id)); */
-
 	if ((err = snd_ctl_elem_read(handle, value)) < 0) {
 		fprintf(stderr, "Control element read error: %s\n", snd_strerror(err));
 		return err;
@@ -345,13 +377,16 @@ int main(int argc, char *argv[])
 		return err;
 	}
 
-	while ((opt = getopt(argc, argv, "hDis:n:r:w:")) != -1) {
+	while ((opt = getopt(argc, argv, "hDip:s:n:r:w:")) != -1) {
 		switch (opt) {
 		case 'h':
 			print_help();
 			break;
 		case 'i':
 			check_controls(handle, id, value);
+			break;
+		case 'p':
+		        turn_codec_on_off(handle, id, value, optarg);
 			break;
 		case 'n':
 			ncoefficients = atoi(optarg);

@@ -34,6 +34,8 @@
 #define FPGA_ADDR_BUFF_HMB 0x4A
 #define FPGA_ADDR_BUFF_MSB 0x4B
 
+#define FPGA_WIPE_ALL_MEM_REG 0xFF
+
 enum gowinxxxx_type {
         GW5A = 0,
 	GW2A
@@ -316,7 +318,7 @@ static int fpga_general_controls_put(struct snd_kcontrol *kcontrol, struct snd_c
 	// This section wipes the whole memory in the FPGA
 	if (strncmp(ucontrol->value.bytes.data, "wipe_coefficients", 17) == 0) {
 	        printk(KERN_INFO "You just order the wiping of the filer coefficients for the CODEC!\n");
-		if (regmap_write(component->regmap, FPGA_WIPE_ALL_MEM, 0xFF) < 0) {
+		if (regmap_write(component->regmap, FPGA_WIPE_ALL_MEM_REG, 0xFF) < 0) {
 			return -EIO;
 		}
 		msleep_interruptible(20);
