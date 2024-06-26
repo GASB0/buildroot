@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/delay.h>
 #include <linux/i2c.h>
 #include <linux/kgdb.h>
 #include <sound/soc.h>
@@ -295,9 +296,34 @@ static int fpga_general_controls_put(struct snd_kcontrol *kcontrol, struct snd_c
 {
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
 
-	regmap_write(component->regmap, FPGA_POWER_REG, (int)ucontrol->value.bytes.data[0]);
+	// Turning the codec on or off
+	if (strncmp(ucontrol->value.bytes.data, "turn_codec_on", 13) == 0) {
+	        printk(KERN_INFO "Turning on the CODEC\n");
+		if (regmap_write(component->regmap, FPGA_POWER_REG, 0x01) < 0) {
+			return -EIO;
+		}
 
-	return 0;
+		return 0;
+	} else if (strncmp(ucontrol->value.bytes.data, "turn_codec_off", 14) == 0) {
+	        printk(KERN_INFO "Turning off the CODEC\n");
+		if (regmap_write(component->regmap, FPGA_POWER_REG, 0x00) < 0) {
+			return -EIO;
+		}
+
+	        return 0;
+	}
+
+	// This section wipes the whole memory in the FPGA
+	if (strncmp(ucontrol->value.bytes.data, "wipe_coefficients", 17) == 0) {
+	        printk(KERN_INFO "You just order the wiping of the filer coefficients for the CODEC!\n");
+		if (regmap_write(component->regmap, FPGA_WIPE_ALL_MEM, 0xFF) < 0) {
+			return -EIO;
+		}
+		msleep_interruptible(20);
+		return 0;
+	}
+
+	return -EIO;
 }
 
 static int fpga_general_controls_get(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)

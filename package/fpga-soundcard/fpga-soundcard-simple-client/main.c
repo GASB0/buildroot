@@ -86,6 +86,34 @@ int get_max_addr(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_t 
 	return maxAddr;
 }
 
+int wipe_coefficients(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_t *value) {
+        int err;
+       	unsigned char *data = (unsigned char *)malloc(17*sizeof(unsigned char));
+	if (strcpy(data, "wipe_coefficients") == NULL) {
+      	  return -1;
+	}
+
+	snd_ctl_elem_id_clear(id);
+	snd_ctl_elem_value_clear(value);
+	snd_ctl_elem_id_set_interface(id, SND_CTL_ELEM_IFACE_CARD);
+	snd_ctl_elem_id_set_name(id, "FPGA FIR General Controls");
+
+	if ((err = lookup_id(id, handle)) < 0) {
+		return err;
+	}
+
+	snd_ctl_elem_value_set_id(value, id);
+
+	// Writing bytes to codec control
+	snd_ctl_elem_set_bytes(value, data, 17*sizeof(unsigned char));
+	if ((err = snd_ctl_elem_write(handle, value)) < 0) {
+		fprintf(stderr, "Control element write error: %s\n", snd_strerror(err));
+		return err;
+	}
+
+        return 0;
+}
+
 int write_sample_coefficients_from_file(snd_ctl_t *handle, snd_ctl_elem_id_t *id, snd_ctl_elem_value_t *value,
 					const char *file_name, int ncoefficients)
 {
@@ -295,6 +323,7 @@ void print_help()
 	printf("  -s           Set max possible accessible address in the FPGA (use the prefix 0x to use hex numbers)\n");
 	printf("  -r           Reads n filter coefficients from codec to $filename\n");
 	printf("  -w           Writes n filter coefficients to the codec from $filename\n");
+	printf("  -D           Wipes the whole filter coefficient memory (all values are set to 0)\n");
 }
 
 int main(int argc, char *argv[])
@@ -316,7 +345,7 @@ int main(int argc, char *argv[])
 		return err;
 	}
 
-	while ((opt = getopt(argc, argv, "his:n:r:w:")) != -1) {
+	while ((opt = getopt(argc, argv, "hDis:n:r:w:")) != -1) {
 		switch (opt) {
 		case 'h':
 			print_help();
@@ -340,6 +369,9 @@ int main(int argc, char *argv[])
 		case 'w':
 			write_sample_coefficients_from_file(handle, id, value, optarg, ncoefficients);
 			break;
+		case 'D':
+		        wipe_coefficients(handle, id, value);
+      		  break;
 		default:
 			print_help();
 			exit(EXIT_FAILURE);
